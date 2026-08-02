@@ -1,0 +1,1 @@
+"""Trip planner application package."""
