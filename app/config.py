@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     MAPBOX_ACCESS_TOKEN: str = ""
     FOURSQUARE_API_KEY: str = ""
 
+    SECRET_KEY: str = ""
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 

@@ -1,18 +1,20 @@
 from __future__ import annotations
+
 import inspect
 import logging
 from typing import Any, Callable
-from langgraph.graph import StateGraph, START, END
-from app.agents.state import AgentState
 
-from app.agents.nodes.extractor import intent_extractor_node 
-from app.agents.nodes.flight import flight_agent_node
-from app.agents.nodes.hotel import hotel_finder_node
-from app.agents.nodes.food import food_finder_node
+from langgraph.graph import END, START, StateGraph
+
 from app.agents.nodes.activity import activity_finder_node
+from app.agents.nodes.cluster import cluster_agent_node
+from app.agents.nodes.extractor import intent_extractor_node
+from app.agents.nodes.flight import flight_agent_node
+from app.agents.nodes.food import food_finder_node
+from app.agents.nodes.hotel import hotel_finder_node
 from app.agents.nodes.optimizer import optimizer_agent
 from app.agents.nodes.synthesizer import final_synthesizer_node
-from app.agents.nodes.cluster import cluster_agent_node
+from app.agents.state import AgentState
 from app.schemas.response import TravelPlanResponse
 
 logger = logging.getLogger("trip_planner")
@@ -29,50 +31,43 @@ if not logger.handlers:
 
 logger.propagate = True
 
+def _log_state_update(key: str, val: Any) -> None:
+    """Single implementation of state-diff logging shared by sync and async nodes."""
+    if isinstance(val, list):
+        logger.info("State updated [%s]: list with %d items", key, len(val))
+        if val and isinstance(val[0], dict) and "name" in val[0]:
+            sample_names = [item.get("name", "N/A") for item in val[:3]]
+            logger.info("Sample data for %s: %s", key, sample_names)
+    elif isinstance(val, dict):
+        logger.info("State updated [%s]: dict with keys -> %s", key, list(val.keys()))
+    else:
+        logger.info("State updated [%s]: %s", key, str(val)[:100])
+
 def log_node_execution(node_name: str, node_func: Callable) -> Callable:
-    async def async_wrapper(state: AgentState) -> dict:
-        logger.info(f"Entering node: {node_name}")
+    """Wrap a graph node with enter/exit logging.
+
+    Handles both sync and async node functions through a single async wrapper;
+    LangGraph awaits the wrapper, which dispatches to the underlying function.
+    """
+    async def wrapper(state: AgentState) -> dict:
+        logger.info("Entering node: %s", node_name)
         try:
             if inspect.iscoroutinefunction(node_func):
                 result = await node_func(state)
             else:
                 result = node_func(state)
 
-            logger.info(f"Successfully executed node: {node_name}")
-            for key, val in result.items():
-                if isinstance(val, list):
-                    logger.info(f"State updated [{key}]: list with {len(val)} items")
-                    if val and isinstance(val, dict) and "name" in val[0]:
-                        sample_names = [item.get("name", "N/A") for item in val[:3]]
-                        logger.info(f"Sample data for {key}: {sample_names}")
-                elif isinstance(val, dict):
-                    logger.info(f"State updated [{key}]: dict with keys -> {list(val.keys())}")
-                else:
-                    logger.info(f"State updated [{key}]: {str(val)[:100]}")
+            logger.info("Successfully executed node: %s", node_name)
+            if isinstance(result, dict):
+                for key, val in result.items():
+                    _log_state_update(key, val)
 
             return result
         except Exception as e:
-            logger.error(f"Error executing node {node_name}: {e}")
+            logger.error("Error executing node %s: %s", node_name, e)
             raise e
 
-    def sync_wrapper(state: AgentState) -> dict:
-        logger.info(f"Entering node: {node_name}")
-        try:
-            result = node_func(state)
-            logger.info(f"Successfully executed node: {node_name}")
-            for key, val in result.items():
-                if isinstance(val, list):
-                    logger.info(f"State updated [{key}]: list with {len(val)} items")
-                elif isinstance(val, dict):
-                    logger.info(f"State updated [{key}]: dict with keys -> {list(val.keys())}")
-                else:
-                    logger.info(f"State updated [{key}]: {str(val)[:100]}")
-            return result
-        except Exception as e:
-            logger.error(f"Error executing node {node_name}: {e}")
-            raise e
-
-    return async_wrapper if inspect.iscoroutinefunction(node_func) else sync_wrapper
+    return wrapper
 
 
 def create_travel_graph():

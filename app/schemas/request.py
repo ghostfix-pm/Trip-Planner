@@ -1,7 +1,9 @@
-from typing import Optional, List
-from pydantic import BaseModel, Field, ConfigDict
 from datetime import date
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 
 class HotelAmenity(str, Enum):
     free_wifi = "free wifi"
@@ -101,6 +103,15 @@ class TravelPlannerRequest(BaseModel):
     non_stop_only: bool = Field(default=False)
 
     travel_pace: Optional[TravelPace] = Field(default=TravelPace.balanced)
+
+    @model_validator(mode="after")
+    def _validate_dates_and_budget(self) -> "TravelPlannerRequest":
+        if self.return_date <= self.departure_date:
+            raise ValueError("return_date must be after departure_date")
+        if self.min_budget is not None and self.max_budget is not None and self.min_budget > self.max_budget:
+            raise ValueError("min_budget must not exceed max_budget")
+        return self
+
 
 TravelRequest = TravelPlannerRequest
 TripRequest = TravelPlannerRequest

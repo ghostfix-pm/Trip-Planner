@@ -1,12 +1,13 @@
-from typing import List, Dict, Any, Tuple
+from typing import Any, Dict, List, Tuple
+
 
 def build_mapbox_routes(
-    selected_hotel: Dict[str, Any], 
+    selected_hotel: Dict[str, Any],
     daily_schedule: List[Dict[str, Any]],
     default_coords: Tuple[float, float] = (38.8951, -77.0364)
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     map_routes = []
-    
+
     hotel_lat = float(selected_hotel.get("latitude") or default_coords[0])
     hotel_lng = float(selected_hotel.get("longitude") or default_coords[1])
 
@@ -47,8 +48,21 @@ def build_mapbox_routes(
     return map_routes, hotel_point
 
 
+def is_place_in_target_country(place: Dict[str, Any], target_country: str) -> bool:
+    """True when a place's country matches (or overlaps) the requested destination country.
+
+    Used by both the activity and food agents to filter out results SerpApi
+    returns from neighbouring countries for searches near a border.
+    """
+    place_country = str(place.get("country") or "").strip().lower()
+    target = str(target_country or "").strip().lower()
+    if not place_country or not target:
+        return True
+    return place_country in target or target in place_country
+
+
 def clean_and_deduplicate_candidates(
-    selected_acts: List[Dict[str, Any]], 
+    selected_acts: List[Dict[str, Any]],
     selected_foods: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     seen_ids = set()
@@ -71,7 +85,7 @@ def clean_and_deduplicate_candidates(
 
     interleaved_items = []
     max_len = max(len(unique_acts), len(unique_foods))
-    
+
     for i in range(max_len):
         if i < len(unique_acts):
             interleaved_items.append(unique_acts[i])
