@@ -48,3 +48,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# --- agent-local files: never commit (agent secrets leak class, Apiiro 2026) ---
+.claude/settings.local.json
+.claude/settings.local.json.*
+.claude/*.local.json
+.specstory/
+.aider*
+.continue/
+.agent-transcripts/
